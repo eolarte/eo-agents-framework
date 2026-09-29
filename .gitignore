@@ -1,0 +1,6 @@
+# Local agent session materials and draft working files.
+.local/
+
+# .NET build output.
+**/bin/
+**/obj/

@@ -1,0 +1,69 @@
+# Food discovery with persistent memory
+
+This sample demonstrates a user-scoped memory component built with
+`AIContextProvider`:
+
+1. The agent welcomes a customer and asks for their name.
+2. A dedicated extraction client captures the customer's name and food
+   preferences as structured data.
+3. The memory provider loads or updates that customer's JSON profile.
+4. The agent uses the remembered profile while searching the in-memory menu
+   and preparing a local order draft.
+
+The remembered profile includes:
+
+- Dietary preferences or restrictions.
+- Favorite cuisines.
+- Disliked foods or ingredients.
+- Spice tolerance.
+- Typical budget.
+
+Budget values are only persisted when the customer explicitly provides a
+realistic non-negative number; malformed or out-of-range extraction values are
+ignored rather than terminating the conversation.
+
+Profiles are stored as JSON files under the user's OS-specific local
+application-data directory:
+
+```text
+Microsoft/AgentFramework/food-discovery-memory/users/<safe-customer-name>.json
+```
+
+The profile data can contain personal preferences and should be treated as
+sensitive. This is a local demonstration, not a production profile store.
+Customers with the same name intentionally share a profile in this sample.
+
+Conversation history is scoped to the current process. Type `reset` to start a
+new conversation while keeping the customer's persisted JSON profile.
+
+The sample never places a real order, processes payment, or connects to an
+external restaurant system. Confirmation only changes local sample state.
+
+## Run with OpenAI
+
+```bash
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o-mini" # optional
+dotnet run --project samples/03-food-discovery-memory/food-discovery-memory.csproj
+```
+
+## Run with Azure AI Foundry
+
+```bash
+export AZURE_OPENAI_ENDPOINT="https://your-project-endpoint"
+export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o-mini" # optional
+az login
+dotnet run --project samples/03-food-discovery-memory/food-discovery-memory.csproj
+```
+
+## Example flow
+
+1. Start the sample and answer the agent's welcome question with your name.
+2. Tell the agent preferences such as “I like Japanese food, avoid spicy
+   dishes, and usually spend under 20.”
+3. Ask for a recommendation. The agent searches the menu and uses the saved
+   preferences as context.
+4. Exit and run the sample again with the same name. The JSON profile is loaded
+   and the preferences are available after the name is provided again.
+5. Use `status`, `confirm`, or `cancel` to inspect and change the local order
+   draft.
