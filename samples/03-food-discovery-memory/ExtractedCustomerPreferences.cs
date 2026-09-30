@@ -2,8 +2,6 @@ using System.Text.Json.Serialization;
 
 sealed class ExtractedCustomerPreferences
 {
-    public string? CustomerName { get; set; }
-
     public List<string>? DietaryPreferences { get; set; }
 
     public List<string>? FavoriteCuisines { get; set; }

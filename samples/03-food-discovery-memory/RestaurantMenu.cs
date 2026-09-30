@@ -89,4 +89,8 @@ sealed class RestaurantMenu
             .Take(8)
             .ToArray();
     }
+
+    public MenuItem? FindByName(string name)
+        => Items.FirstOrDefault(item =>
+            item.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
 }

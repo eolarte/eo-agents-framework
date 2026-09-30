@@ -30,13 +30,15 @@ sealed class CustomerMemoryState
             DislikedFoods,
             other.DislikedFoods);
         SpiceTolerance ??= other.SpiceTolerance;
-        OrderHistory = [.. OrderHistory, .. other.OrderHistory];
+        OrderHistory = [
+            .. OrderHistory.Where(HasStructuredDishHistory),
+            .. other.OrderHistory.Where(HasStructuredDishHistory)
+        ];
         TypicalBudget ??= other.TypicalBudget;
     }
 
     public void MergeFrom(ExtractedCustomerPreferences other)
     {
-        CustomerName ??= CleanValue(other.CustomerName);
         DietaryPreferences = MergeValues(
             DietaryPreferences,
             other.DietaryPreferences);
@@ -65,9 +67,22 @@ sealed class CustomerMemoryState
 
     private static string? CleanValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool HasStructuredDishHistory(SavedOrder order)
+        => order.Dishes is { Count: > 0 };
 }
 
 sealed record SavedOrder(
-    string CustomerRequest,
-    string AgentResponse,
+    List<SavedDish> Dishes,
     DateTimeOffset ConfirmedAtUtc);
+
+sealed record SavedDish(
+    string MenuItemId,
+    string Name,
+    string Description,
+    decimal Price,
+    List<SavedVariation> Variations);
+
+sealed record SavedVariation(
+    string Request,
+    string Outcome);

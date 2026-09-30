@@ -1,7 +1,8 @@
 sealed record OrderDraft(
-    string CustomerRequest,
-    string AgentResponse,
+    List<OrderConversationTurn> Conversation,
     OrderStatus Status);
+
+sealed record OrderConversationTurn(string Speaker, string Message);
 
 enum OrderStatus
 {

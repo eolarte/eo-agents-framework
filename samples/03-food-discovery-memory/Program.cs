@@ -12,16 +12,16 @@ var extractionClient = CreateExtractionClient(modelName);
 var memory = new CustomerPreferencesMemory(
     extractionClient,
     modelName,
-    profileStore);
+    profileStore,
+    menu);
 var agent = CreateAgent(modelName, menu, memory);
 var session = await agent.CreateSessionAsync();
 
 Console.WriteLine("Food discovery with persistent customer memory");
 Console.WriteLine("Preferences are saved per customer in a local JSON profile.");
-Console.WriteLine("The agent will first ask for your name.");
-Console.WriteLine(await agent.RunAsync(
-    "Welcome the customer and ask for their name before helping them.",
-    session));
+var customerName = PromptForCustomerName();
+await memory.SelectCustomerAsync(session, customerName);
+Console.WriteLine($"Hello, {customerName}!");
 Console.WriteLine(
     "Describe what you would like to eat, or type status, confirm, cancel, or reset.");
 
@@ -44,9 +44,9 @@ while (true)
         session = await agent.CreateSessionAsync();
         currentOrder = null;
         Console.WriteLine("Conversation reset. The saved customer profile was kept.");
-        Console.WriteLine(await agent.RunAsync(
-            "Welcome the customer and ask for their name before helping them.",
-            session));
+        customerName = PromptForCustomerName();
+        await memory.SelectCustomerAsync(session, customerName);
+        Console.WriteLine($"Hello, {customerName}!");
         continue;
     }
 
@@ -72,11 +72,36 @@ while (true)
     var responseText = response.ToString();
     Console.WriteLine($"\nFood discovery agent: {responseText}");
 
+    var conversation = currentOrder?.Status == OrderStatus.AwaitingConfirmation
+        ? new List<OrderConversationTurn>(currentOrder.Conversation)
+        : [];
+    conversation.Add(new OrderConversationTurn("Customer", customerRequest));
+    conversation.Add(new OrderConversationTurn("Food discovery agent", responseText));
     currentOrder = new OrderDraft(
-        CustomerRequest: customerRequest,
-        AgentResponse: responseText,
+        Conversation: conversation,
         Status: OrderStatus.AwaitingConfirmation);
     Console.WriteLine($"Local order status: {currentOrder.Status}");
+}
+
+static string PromptForCustomerName()
+{
+    while (true)
+    {
+        Console.Write("Your name: ");
+        var name = Console.ReadLine();
+
+        if (name is null)
+        {
+            throw new EndOfStreamException("No customer name was provided.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        Console.WriteLine("Please enter a name to select your saved profile.");
+    }
 }
 
 static IChatClient CreateExtractionClient(string modelName)
@@ -117,8 +142,7 @@ static AIAgent CreateAgent(
     var instructions =
         "You are a friendly food discovery and order-form assistant. " +
         "Use the search_menu tool before recommending menu items, and only recommend " +
-        "items returned by that tool. On the first turn, ask the customer for their " +
-        "name before making recommendations. Use remembered preferences as helpful " +
+        "items returned by that tool. Use remembered preferences as helpful " +
         "context, but ask a concise follow-up question when the request is ambiguous. " +
         "When the customer is ready, prepare a concise local order draft and ask for " +
         "confirmation. Never claim that an external order was placed.";
@@ -186,8 +210,10 @@ static async Task<(bool Handled, OrderDraft? UpdatedOrder)> TryHandleOrderComman
         else
         {
             Console.WriteLine($"Local order status: {currentOrder.Status}");
-            Console.WriteLine($"Customer request: {currentOrder.CustomerRequest}");
-            Console.WriteLine($"Agent response: {currentOrder.AgentResponse}");
+            foreach (var turn in currentOrder.Conversation)
+            {
+                Console.WriteLine($"{turn.Speaker}: {turn.Message}");
+            }
         }
 
         return (true, currentOrder);
