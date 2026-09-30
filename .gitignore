@@ -4,3 +4,7 @@
 # .NET build output.
 **/bin/
 **/obj/
+
+# Frontend dependencies and generated assets.
+**/node_modules/
+**/wwwroot/customer-ui/

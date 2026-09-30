@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Avenir Next', ui-sans-serif, system-ui, sans-serif;
+  color: #213b32;
+  background: #f7f5ef;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; scroll-behavior: smooth; }
+body { min-width: 320px; min-height: 100vh; margin: 0; }
+button, input, textarea { font: inherit; }
+::selection { color: #fffefa; background: #315d49; }
+
+.chat-scroll { scrollbar-color: #d4d8cf transparent; scrollbar-width: thin; }
+.chat-scroll::-webkit-scrollbar { width: 7px; }
+.chat-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: #d4d8cf; }
+
+.typing-dot { display: block; width: 6px; height: 6px; border-radius: 50%; background: #70836e; animation: bounce 1s infinite ease-in-out; }
+.typing-dot.delay-150 { animation-delay: .15s; }
+.typing-dot.delay-300 { animation-delay: .3s; }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .55; } 30% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
