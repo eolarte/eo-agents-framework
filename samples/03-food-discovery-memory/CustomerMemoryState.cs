@@ -12,6 +12,8 @@ sealed class CustomerMemoryState
 
     public string? SpiceTolerance { get; set; }
 
+    public List<SavedOrder> OrderHistory { get; set; } = [];
+
     [JsonConverter(typeof(SafeNullableDecimalConverter))]
     public decimal? TypicalBudget { get; set; }
 
@@ -28,6 +30,7 @@ sealed class CustomerMemoryState
             DislikedFoods,
             other.DislikedFoods);
         SpiceTolerance ??= other.SpiceTolerance;
+        OrderHistory = [.. OrderHistory, .. other.OrderHistory];
         TypicalBudget ??= other.TypicalBudget;
     }
 
@@ -63,3 +66,8 @@ sealed class CustomerMemoryState
     private static string? CleanValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
+
+sealed record SavedOrder(
+    string CustomerRequest,
+    string AgentResponse,
+    DateTimeOffset ConfirmedAtUtc);

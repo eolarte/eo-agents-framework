@@ -9,6 +9,7 @@ This sample demonstrates a user-scoped memory component built with
 3. The memory provider loads or updates that customer's JSON profile.
 4. The agent uses the remembered profile while searching the in-memory menu
    and preparing a local order draft.
+5. Confirmed local orders are added to the customer's profile history.
 
 The remembered profile includes:
 
@@ -17,6 +18,8 @@ The remembered profile includes:
 - Disliked foods or ingredients.
 - Spice tolerance.
 - Typical budget.
+- Confirmed orders, including the customer request, the agent's order response,
+  and the UTC confirmation time.
 
 Budget values are only persisted when the customer explicitly provides a
 realistic non-negative number; malformed or out-of-range extraction values are
@@ -37,7 +40,8 @@ Conversation history is scoped to the current process. Type `reset` to start a
 new conversation while keeping the customer's persisted JSON profile.
 
 The sample never places a real order, processes payment, or connects to an
-external restaurant system. Confirmation only changes local sample state.
+external restaurant system. Confirmation records the order locally in the
+customer's profile. Pending and cancelled drafts are not added to order history.
 
 ## Run with OpenAI
 
@@ -66,4 +70,4 @@ dotnet run --project samples/03-food-discovery-memory/food-discovery-memory.cspr
 4. Exit and run the sample again with the same name. The JSON profile is loaded
    and the preferences are available after the name is provided again.
 5. Use `status`, `confirm`, or `cancel` to inspect and change the local order
-   draft.
+   draft. Confirmed orders appear in the `OrderHistory` array of the profile JSON.

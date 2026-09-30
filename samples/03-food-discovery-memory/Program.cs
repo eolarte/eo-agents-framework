@@ -50,8 +50,14 @@ while (true)
         continue;
     }
 
-    if (TryHandleOrderCommand(customerInput, ref currentOrder))
+    var orderCommand = await TryHandleOrderCommand(
+        customerInput,
+        session,
+        memory,
+        currentOrder);
+    if (orderCommand.Handled)
     {
+        currentOrder = orderCommand.UpdatedOrder;
         continue;
     }
 
@@ -163,7 +169,11 @@ static AIAgent CreateAgent(
         });
 }
 
-static bool TryHandleOrderCommand(string input, ref OrderDraft? currentOrder)
+static async Task<(bool Handled, OrderDraft? UpdatedOrder)> TryHandleOrderCommand(
+    string input,
+    AgentSession session,
+    CustomerPreferencesMemory memory,
+    OrderDraft? currentOrder)
 {
     var command = input.Trim().ToLowerInvariant();
 
@@ -180,16 +190,18 @@ static bool TryHandleOrderCommand(string input, ref OrderDraft? currentOrder)
             Console.WriteLine($"Agent response: {currentOrder.AgentResponse}");
         }
 
-        return true;
+        return (true, currentOrder);
     }
 
     if (currentOrder?.Status == OrderStatus.AwaitingConfirmation &&
         command is "yes" or "y" or "confirm")
     {
+        await memory.RecordConfirmedOrderAsync(session, currentOrder);
         currentOrder = currentOrder with { Status = OrderStatus.Confirmed };
         Console.WriteLine("Local order status: Confirmed");
+        Console.WriteLine("The order was saved to the customer's local profile.");
         Console.WriteLine("No external restaurant order was placed.");
-        return true;
+        return (true, currentOrder);
     }
 
     if (currentOrder?.Status == OrderStatus.AwaitingConfirmation &&
@@ -197,8 +209,8 @@ static bool TryHandleOrderCommand(string input, ref OrderDraft? currentOrder)
     {
         currentOrder = currentOrder with { Status = OrderStatus.Cancelled };
         Console.WriteLine("Local order status: Cancelled");
-        return true;
+        return (true, currentOrder);
     }
 
-    return false;
+    return (false, currentOrder);
 }
