@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>payroll_portal_rag</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.VectorData.InMemory" Version="1.0.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.23.0" />
+    <PackageReference Include="Microsoft.Agents.AI.DevUI" Version="1.23.0-preview.260928.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.23.0-preview.260928.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.23.0-alpha.260928.1" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="policies/**/*.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
