@@ -2,6 +2,14 @@ namespace food_ordering.Application;
 
 public sealed record CustomerChatRequest(string CustomerId, string Message);
 public sealed record CustomerChatResult(string Response, string OrderStatus);
+public sealed record CustomerOrderSnapshot(
+    string Id,
+    string Summary,
+    string OrderStatus,
+    string PaymentMethod,
+    string PaymentStatus,
+    string DeliveryStatus,
+    DateTime CreatedAtUtc);
 public sealed record CustomerAgentSet(
     Microsoft.Agents.AI.AIAgent Coordinator,
     Microsoft.Agents.AI.AIAgent MenuAgent,
@@ -18,6 +26,8 @@ public interface ICustomerOrderStore
     Task<string> GetDeliveryStatusAsync(string customerId, string? orderId = null);
     Task<bool> IsOutForDeliveryAsync(string customerId, string? orderId = null);
     Task<string> GetRecentOrdersAsync(string customerId);
+    Task<CustomerOrderSnapshot?> GetCurrentOrderSnapshotAsync(string customerId);
+    Task<bool> HasPendingConfirmationAsync(string customerId);
     Task<string> ConfirmAsync(string customerId);
     Task<string> CancelAsync(string customerId);
 }
@@ -55,10 +65,15 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
             using var activity = FoodOrderingTelemetry.ActivitySource.StartActivity("food-ordering.customer-message");
             activity?.SetTag("food_ordering.customer_id", CustomerIdentity.CreateStorageKey(customerId));
 
-            if (input.Equals("confirm", StringComparison.OrdinalIgnoreCase) || input.Equals("yes", StringComparison.OrdinalIgnoreCase))
+            if (IsSimpleConfirmation(input) || IsExplicitOrderConfirmation(input))
             {
-                var result = await orders.ConfirmAsync(customerId);
-                return new CustomerChatResult(result, await orders.GetStatusAsync(customerId));
+                var hasPendingDraft = await orders.HasPendingConfirmationAsync(customerId);
+                if (hasPendingDraft || IsExplicitOrderConfirmation(input) ||
+                    input.Trim().Equals("confirm", StringComparison.OrdinalIgnoreCase))
+                {
+                    var result = await orders.ConfirmAsync(customerId);
+                    return new CustomerChatResult(result, await orders.GetStatusAsync(customerId));
+                }
             }
             if (input.Equals("cancel", StringComparison.OrdinalIgnoreCase) || input.Equals("no", StringComparison.OrdinalIgnoreCase))
             {
@@ -108,6 +123,19 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
             message.Contains("track my delivery", StringComparison.Ordinal) ||
             message.Contains("track order", StringComparison.Ordinal) ||
             message.Contains("check my order", StringComparison.Ordinal);
+    }
+
+    private static bool IsSimpleConfirmation(string input)
+        => input.Trim().Equals("confirm", StringComparison.OrdinalIgnoreCase) ||
+           input.Trim().Equals("yes", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsExplicitOrderConfirmation(string input)
+    {
+        var message = input.Trim().ToLowerInvariant();
+        return (message.Contains("confirm", StringComparison.Ordinal) &&
+                (message.Contains("order", StringComparison.Ordinal) || message.Contains("draft", StringComparison.Ordinal))) ||
+            message.Contains("proceed with the order", StringComparison.Ordinal) ||
+            message.Contains("proceed with this order", StringComparison.Ordinal);
     }
 
     private static bool IsOrderHistoryRequest(string input)

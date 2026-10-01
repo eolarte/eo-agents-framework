@@ -31,6 +31,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
+  const [order, setOrder] = useState(null);
+  const [orderError, setOrderError] = useState('');
   const transcriptRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -38,11 +40,65 @@ export default function App() {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
+  useEffect(() => {
+    const id = customerId.trim();
+    if (!id) {
+      setOrder(null);
+      setOrderError('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    async function refreshOrder() {
+      try {
+        const response = await fetch(`/api/orders/current?customerId=${encodeURIComponent(id)}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'The order summary could not be loaded.');
+        if (active) {
+          setOrder(data?.order ?? null);
+          setOrderError('');
+        }
+      } catch (cause) {
+        if (active && cause.name !== 'AbortError') {
+          setOrderError(cause instanceof Error ? cause.message : 'The order summary could not be loaded.');
+        }
+      }
+    }
+
+    refreshOrder();
+    const interval = order ? window.setInterval(refreshOrder, 5000) : undefined;
+    return () => {
+      active = false;
+      controller.abort();
+      if (interval) window.clearInterval(interval);
+    };
+  }, [customerId, order?.id]);
+
   function changeCustomerId(value) {
     setCustomerId(value);
     setMessages(initialMessage());
     setOrderStatus('');
+    setOrder(null);
+    setOrderError('');
     setError('');
+  }
+
+  async function refreshOrder(id = customerId.trim()) {
+    if (!id) return;
+    try {
+      const response = await fetch(`/api/orders/current?customerId=${encodeURIComponent(id)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'The order summary could not be loaded.');
+      if (id === customerId.trim()) {
+        setOrder(data?.order ?? null);
+        setOrderError('');
+      }
+    } catch (cause) {
+      if (id === customerId.trim()) {
+        setOrderError(cause instanceof Error ? cause.message : 'The order summary could not be loaded.');
+      }
+    }
   }
 
   async function sendMessage(message = draft) {
@@ -69,6 +125,7 @@ export default function App() {
       if (typeof data?.response !== 'string') throw new Error('The chat returned an unexpected response. Please try again.');
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: data.response }]);
       setOrderStatus(typeof data.orderStatus === 'string' ? data.orderStatus : '');
+      await refreshOrder(id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong. Please try again.');
     } finally {
@@ -102,7 +159,7 @@ export default function App() {
           </a>
         </header>
 
-        <section id="main" className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[28px] border border-[#e8e4d8] bg-paper shadow-card lg:grid-cols-[minmax(260px,350px)_minmax(0,1fr)]">
+        <section id="main" className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[28px] border border-[#e8e4d8] bg-paper shadow-card lg:grid-cols-[minmax(230px,280px)_minmax(0,1fr)_minmax(250px,300px)]">
           <aside className="relative hidden flex-col justify-between overflow-hidden bg-moss p-8 text-cream lg:flex xl:p-10">
             <div className="absolute -right-16 top-28 h-56 w-56 rounded-full border border-white/10" />
             <div className="absolute -right-5 top-40 h-36 w-36 rounded-full border border-white/10" />
@@ -132,6 +189,13 @@ export default function App() {
               <input id="customer-id" value={customerId} onChange={(event) => changeCustomerId(event.target.value)} className="w-36 rounded-md border border-[#e7e3d9] bg-white px-2.5 py-1.5 text-sm text-ink outline-none transition focus:border-leaf focus:ring-2 focus:ring-leaf/20 disabled:cursor-not-allowed disabled:bg-[#f5f3ed]" autoComplete="off" spellCheck="false" disabled={loading} />
               <span className="text-[11px] text-[#92988e]">Your preferences stay with this ID.</span>
             </div>
+
+            <details className="border-b border-[#eeeae0] bg-[#fcfbf8] px-5 py-3 lg:hidden">
+              <summary className="cursor-pointer list-none rounded-md text-sm font-semibold text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss">
+                <span className="flex items-center justify-between gap-3"><span>Your order</span><span className="truncate text-xs font-medium text-[#788276]">{order ? `${order.id} · ${order.orderStatus}` : 'No saved order yet'}</span></span>
+              </summary>
+              <OrderPanel order={order} error={orderError} compact />
+            </details>
 
             <div ref={transcriptRef} className="chat-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-6 sm:px-8 sm:py-8">
               <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-5" role="log" aria-label="Conversation messages" aria-live="polite" aria-relevant="additions">
@@ -164,11 +228,55 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          <aside className="hidden min-h-0 flex-col border-l border-[#eeeae0] bg-[#fcfbf8] p-5 lg:flex xl:p-6" aria-label="Current order summary">
+            <div className="mb-5 border-b border-[#eae7de] pb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-leaf">Order tracker</p>
+              <h2 className="mt-1 font-display text-2xl text-ink">Your order</h2>
+            </div>
+            <OrderPanel order={order} error={orderError} />
+          </aside>
         </section>
         <footer className="flex items-center justify-between gap-4 px-1 pt-4 text-[10px] text-[#899187] sm:text-xs"><span>Olive &amp; Ember <span className="mx-1">·</span> Something good is cooking</span><a className="rounded underline decoration-[#bcc2b7] underline-offset-4 hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss lg:hidden" href="/devui">Agent studio</a></footer>
       </div>
     </main>
   );
+}
+
+function OrderPanel({ order, error, compact = false }) {
+  if (!order) {
+    return <div className={`text-sm leading-6 text-[#7a8379] ${compact ? 'pt-4' : ''}`}>
+      {error ? <p role="status" className="text-[#9b5039]">{error}</p> : <p>Your saved order and agreed choices will appear here when checkout creates a draft.</p>}
+      <p className="mt-3 text-xs leading-5 text-[#969b91]">Only details saved with this local demo customer ID are shown.</p>
+    </div>;
+  }
+
+  return <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+    {error && <p role="status" className="mb-3 text-xs leading-5 text-[#9b5039]">Could not refresh: {error}</p>}
+    <div className="rounded-xl bg-[#eef1e9] p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#748071]">Order {order.id}</p>
+      <p className="mt-2 text-sm font-semibold capitalize leading-5 text-moss">{order.orderStatus}</p>
+      <p className="mt-1 text-[11px] text-[#7b8578]">Saved {new Date(order.createdAtUtc).toLocaleString()}</p>
+    </div>
+
+    <section className="mt-5">
+      <h3 className="text-xs font-semibold uppercase tracking-[.12em] text-[#81897f]">Agreed order</h3>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[#34483d]">{order.summary || 'No item details were saved.'}</p>
+    </section>
+
+    <section className="mt-5 border-t border-[#eae7de] pt-4">
+      <h3 className="text-xs font-semibold uppercase tracking-[.12em] text-[#81897f]">Payment choice</h3>
+      <p className="mt-2 text-sm font-medium capitalize text-[#34483d]">{order.paymentMethod}</p>
+      <p className="mt-1 text-xs leading-5 text-[#7b8578]">{order.paymentStatus}</p>
+      <p className="mt-2 text-[10px] leading-4 text-[#969b91]">Demo only. No payment was collected.</p>
+    </section>
+
+    <section className="mt-5 border-t border-[#eae7de] pt-4">
+      <h3 className="text-xs font-semibold uppercase tracking-[.12em] text-[#81897f]">Simulated delivery</h3>
+      <p className="mt-2 text-sm font-medium capitalize text-[#34483d]">{order.deliveryStatus}</p>
+      <p className="mt-1 text-xs leading-5 text-[#7b8578]">Status refreshes while this chat is open.</p>
+    </section>
+  </div>;
 }
 
 function AssistantAvatar() {

@@ -65,8 +65,9 @@ public sealed class FoodOrderingAgentFactory(
             "restaurant rules and facts to PolicyAgent, delivery questions and delivery tracking to DeliveryAgent, " +
             "local order preparation and demo payment checks to CheckoutPaymentAgent, and order/payment status questions " +
             "to OrderStatusAgent. Use the appropriate status tool for status questions instead of guessing. " +
-            "Use the file memory tools to remember customer preferences when useful. Confirm any order draft with the " +
-            "customer before treating it as confirmed. Explain that every order and payment action is simulated locally.",
+            "Use the file memory tools to remember customer preferences when useful. Never claim a draft is confirmed just " +
+            "because the customer said they confirm it; only persisted local lifecycle status is authoritative. Do not create " +
+            "another draft to confirm an existing draft. Explain that every order and payment action is simulated locally.",
             [menuAgent.AsAIFunction(), policyAgent.AsAIFunction(), checkoutAgent.AsAIFunction(), deliveryAgent.AsAIFunction(), statusAgent.AsAIFunction()],
             [memoryProvider]);
 

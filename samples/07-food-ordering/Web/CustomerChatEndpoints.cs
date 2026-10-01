@@ -8,6 +8,15 @@ public static class CustomerChatEndpoints
 {
     public static IEndpointRouteBuilder MapCustomerChat(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/orders/current", async (string? customerId, ICustomerOrderStore orders) =>
+        {
+            if (string.IsNullOrWhiteSpace(customerId))
+                return Results.BadRequest(new { error = "customerId is required." });
+
+            var order = await orders.GetCurrentOrderSnapshotAsync(customerId.Trim());
+            return Results.Ok(new { order });
+        });
+
         endpoints.MapPost("/api/chat", async (CustomerChatRequest request, CustomerChatService chat, CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.CustomerId) || string.IsNullOrWhiteSpace(request.Message))

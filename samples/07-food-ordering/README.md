@@ -59,9 +59,13 @@ finish in roughly 30–90 seconds.
 
 Open http://localhost:5000 for the sample customer chat or
 http://localhost:5000/devui for DevUI. Enter a customer name or ID in the chat
-page to keep that customer's memory separate. Use different IDs to inspect
-profiles independently. The in-memory vector index is rebuilt from the sample
-menu and `policies/*.md` on startup.
+page to keep that customer's memory separate. The order panel shows the latest
+saved order summary and its simulated order, payment, and delivery statuses; it
+refreshes while the chat is open. The read-only
+`GET /api/orders/current?customerId=...` endpoint provides the same persisted
+snapshot. Use different IDs to inspect profiles and orders independently. The
+in-memory vector index is rebuilt from the sample menu and `policies/*.md` on
+startup.
 
 For frontend-only iteration, run `npm run dev` from `samples/07-food-ordering`
 while the ASP.NET sample is running at `http://localhost:5000`. Vite serves the

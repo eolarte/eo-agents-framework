@@ -97,6 +97,30 @@ public sealed class CustomerOrderStore(IDbContextFactory<CustomerOrderDbContext>
                 $"#{ShortId(order.Id)} — {Label(order.Status)}, payment {Label(order.Payment.Status)}, delivery {Label(order.Delivery.Status)}"));
     }
 
+    public async Task<CustomerOrderSnapshot?> GetCurrentOrderSnapshotAsync(string customerId)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        var result = await FindOrderAsync(db, customerId, orderId: null);
+        if (result.Order is not { } order) return null;
+
+        return new CustomerOrderSnapshot(
+            ShortId(order.Id),
+            order.Summary,
+            Label(order.Status),
+            order.Payment.Method,
+            Label(order.Payment.Status),
+            Label(order.Delivery.Status),
+            order.CreatedAtUtc);
+    }
+
+    public async Task<bool> HasPendingConfirmationAsync(string customerId)
+    {
+        var customerKey = CustomerIdentity.CreateStorageKey(customerId);
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        return await db.Orders.AnyAsync(order =>
+            order.CustomerKey == customerKey && order.Status == OrderStatus.AwaitingConfirmation);
+    }
+
     public async Task<string> ConfirmAsync(string customerId)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync();
