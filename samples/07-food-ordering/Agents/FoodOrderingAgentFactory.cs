@@ -67,11 +67,13 @@ public sealed class FoodOrderingAgentFactory(
             "to OrderStatusAgent. Use the appropriate status tool for status questions instead of guessing. " +
             "Use the file memory tools to remember customer preferences when useful. Never claim a draft is confirmed just " +
             "because the customer said they confirm it; only persisted local lifecycle status is authoritative. Do not create " +
-            "another draft to confirm an existing draft. Explain that every order and payment action is simulated locally.",
+            "another draft to confirm an existing draft. " +
+            "Explain that every order and payment action is simulated locally.",
             [menuAgent.AsAIFunction(), policyAgent.AsAIFunction(), checkoutAgent.AsAIFunction(), deliveryAgent.AsAIFunction(), statusAgent.AsAIFunction()],
             [memoryProvider]);
 
-        return new CustomerAgentSet(coordinator, menuAgent, policyAgent, checkoutAgent, deliveryAgent, statusAgent, memoryProvider);
+        return new CustomerAgentSet(coordinator, menuAgent, policyAgent, checkoutAgent, deliveryAgent, statusAgent,
+            memoryProvider, new CustomerActionClassifier(chatClient, configuration.ModelName));
     }
 
     private AIAgent CreateAgent(string name, string instructions, IList<AITool>? tools = null, IList<AIContextProvider>? providers = null)

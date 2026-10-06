@@ -16,6 +16,7 @@ function Icon({ name, className = '' }) {
     sparkle: <><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z"/><path d="m19 16 .8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z"/></>,
     clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
     arrow: <><path d="M7 17 17 7M7 7h10v10"/></>,
+    close: <><path d="m6 6 12 12M18 6 6 18"/></>,
   };
   return <svg {...common}>{paths[name]}</svg>;
 }
@@ -33,6 +34,10 @@ export default function App() {
   const [orderStatus, setOrderStatus] = useState('');
   const [order, setOrder] = useState(null);
   const [orderError, setOrderError] = useState('');
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const transcriptRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -45,12 +50,16 @@ export default function App() {
     if (!id) {
       setOrder(null);
       setOrderError('');
+      setHistory([]);
+      setHistoryLoading(false);
+      setHistoryError('');
+      setHistoryOpen(false);
       return undefined;
     }
 
     const controller = new AbortController();
     let active = true;
-    async function refreshOrder() {
+    async function refreshCurrentOrder() {
       try {
         const response = await fetch(`/api/orders/current?customerId=${encodeURIComponent(id)}`, { signal: controller.signal });
         const data = await response.json();
@@ -66,8 +75,25 @@ export default function App() {
       }
     }
 
-    refreshOrder();
-    const interval = order ? window.setInterval(refreshOrder, 5000) : undefined;
+    async function refreshHistory() {
+      try {
+        const response = await fetch(`/api/orders/history?customerId=${encodeURIComponent(id)}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Order history could not be loaded.');
+        if (active) {
+          setHistory(Array.isArray(data?.orders) ? data.orders : []);
+          setHistoryError('');
+        }
+      } catch (cause) {
+        if (active && cause.name !== 'AbortError') {
+          setHistoryError(cause instanceof Error ? cause.message : 'Order history could not be loaded.');
+        }
+      }
+    }
+
+    refreshCurrentOrder();
+    refreshHistory();
+    const interval = order ? window.setInterval(refreshCurrentOrder, 5000) : undefined;
     return () => {
       active = false;
       controller.abort();
@@ -81,6 +107,10 @@ export default function App() {
     setOrderStatus('');
     setOrder(null);
     setOrderError('');
+    setHistory([]);
+    setHistoryLoading(false);
+    setHistoryError('');
+    setHistoryOpen(false);
     setError('');
   }
 
@@ -98,6 +128,26 @@ export default function App() {
       if (id === customerId.trim()) {
         setOrderError(cause instanceof Error ? cause.message : 'The order summary could not be loaded.');
       }
+    }
+  }
+
+  async function refreshHistory(id = customerId.trim()) {
+    if (!id) return;
+    setHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/orders/history?customerId=${encodeURIComponent(id)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || 'Order history could not be loaded.');
+      if (id === customerId.trim()) {
+        setHistory(Array.isArray(data?.orders) ? data.orders : []);
+        setHistoryError('');
+      }
+    } catch (cause) {
+      if (id === customerId.trim()) {
+        setHistoryError(cause instanceof Error ? cause.message : 'Order history could not be loaded.');
+      }
+    } finally {
+      if (id === customerId.trim()) setHistoryLoading(false);
     }
   }
 
@@ -125,7 +175,7 @@ export default function App() {
       if (typeof data?.response !== 'string') throw new Error('The chat returned an unexpected response. Please try again.');
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: data.response }]);
       setOrderStatus(typeof data.orderStatus === 'string' ? data.orderStatus : '');
-      await refreshOrder(id);
+      await Promise.all([refreshOrder(id), refreshHistory(id)]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong. Please try again.');
     } finally {
@@ -159,29 +209,19 @@ export default function App() {
           </a>
         </header>
 
-        <section id="main" className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[28px] border border-[#e8e4d8] bg-paper shadow-card lg:grid-cols-[minmax(230px,280px)_minmax(0,1fr)_minmax(250px,300px)]">
-          <aside className="relative hidden flex-col justify-between overflow-hidden bg-moss p-8 text-cream lg:flex xl:p-10">
-            <div className="absolute -right-16 top-28 h-56 w-56 rounded-full border border-white/10" />
-            <div className="absolute -right-5 top-40 h-36 w-36 rounded-full border border-white/10" />
-            <div className="relative z-10">
-              <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-[#d6ddcb]"><span className="h-px w-7 bg-clay" /> Made for good company</p>
-              <h1 className="max-w-[270px] font-display text-5xl leading-[1.08] xl:text-[3.5rem]">A little help with what’s on the table.</h1>
-              <p className="mt-5 max-w-[270px] text-sm leading-6 text-[#dce4d7]">Find a new favorite, make a plan for dinner, and keep an eye on your demo order.</p>
-            </div>
-            <div className="relative z-10 rounded-2xl border border-white/15 bg-white/[.07] p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold"><Icon name="sparkle" className="h-4 w-4 text-[#e8a383]" /> Your table, your way</div>
-              <p className="mt-2 text-xs leading-5 text-[#dce4d7]">Tell us what you’re craving or what you need to avoid. We’ll find a good place to start.</p>
-            </div>
-            <div className="pointer-events-none absolute -bottom-12 -left-14 h-44 w-44 rounded-full border border-white/10" />
-          </aside>
-
+        <section id="main" className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[28px] border border-[#e8e4d8] bg-paper shadow-card lg:grid-cols-[minmax(0,1fr)_minmax(250px,300px)]">
           <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-[#eeeae0] px-5 py-4 sm:px-8 sm:py-5">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf1e9] text-moss lg:hidden"><Icon name="leaf" className="h-5 w-5" /></span>
-                <div className="min-w-0"><h2 className="truncate font-display text-xl sm:text-2xl">Your guest table</h2><p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#778078]"><span className="h-1.5 w-1.5 rounded-full bg-[#77966a]" /> Ready when you are</p></div>
+                <div className="min-w-0"><h1 className="truncate font-display text-xl sm:text-2xl">Your guest table</h1><p className="mt-0.5 flex items-center gap-1.5 text-xs text-[#778078]"><span className="h-1.5 w-1.5 rounded-full bg-[#77966a]" /> Ready when you are</p></div>
               </div>
-              <div className="flex items-center gap-2 rounded-full bg-[#f5f3ed] px-3 py-2 text-[11px] font-medium text-[#67736a] sm:text-xs"><Icon name="clock" className="h-3.5 w-3.5" /> Demo experience</div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => { setHistoryOpen(true); refreshHistory(); }} className="inline-flex items-center gap-1.5 rounded-full border border-[#e7e3d9] bg-white px-3 py-2 text-[11px] font-semibold text-moss transition hover:border-leaf hover:bg-[#f7faf4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss sm:text-xs" aria-haspopup="dialog" aria-expanded={historyOpen}>
+                  <Icon name="clock" className="h-3.5 w-3.5" /> History
+                </button>
+                <div className="hidden items-center gap-2 rounded-full bg-[#f5f3ed] px-3 py-2 text-[11px] font-medium text-[#67736a] sm:flex sm:text-xs"><Icon name="clock" className="h-3.5 w-3.5" /> Demo experience</div>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#f0ede5] bg-[#fcfbf8] px-5 py-3 sm:px-8">
@@ -212,7 +252,10 @@ export default function App() {
 
             <div className="border-t border-[#eeeae0] bg-[#fffefa] px-4 py-4 sm:px-8 sm:py-5">
               <div className="mx-auto max-w-3xl">
-                {orderStatus && <div className="mb-3 flex min-w-0 items-start gap-2 rounded-lg bg-[#f1f5ee] px-3 py-2 text-xs leading-5 text-[#50694f]" role="status"><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-leaf"/><span className="min-w-0 break-words [overflow-wrap:anywhere]"><strong className="font-semibold">Order update</strong><span className="mx-1">·</span>{orderStatus}</span></div>}
+                {orderStatus && <details className="mb-3 rounded-lg bg-[#f1f5ee] px-3 py-2 text-xs leading-5 text-[#50694f]">
+                  <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss">Order update</summary>
+                  <p className="mt-1 break-words [overflow-wrap:anywhere]">{orderStatus}</p>
+                </details>}
                 {error && <div className="mb-3 flex min-w-0 items-start gap-2 rounded-lg border border-[#f0d6ca] bg-[#fff7f3] px-3 py-2.5 text-sm text-[#9b5039]" role="alert"><span aria-hidden="true">!</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span></div>}
                 <form onSubmit={handleSubmit} className="rounded-2xl border border-[#e4e1d7] bg-white p-2 shadow-[0_3px_16px_rgba(36,58,46,.04)] transition focus-within:border-[#a8b69f] focus-within:ring-2 focus-within:ring-leaf/15">
                   <label htmlFor="message" className="sr-only">Message Olive and Ember</label>
@@ -239,8 +282,61 @@ export default function App() {
         </section>
         <footer className="flex items-center justify-between gap-4 px-1 pt-4 text-[10px] text-[#899187] sm:text-xs"><span>Olive &amp; Ember <span className="mx-1">·</span> Something good is cooking</span><a className="rounded underline decoration-[#bcc2b7] underline-offset-4 hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss lg:hidden" href="/devui">Agent studio</a></footer>
       </div>
+      <HistoryDrawer history={history} loading={historyLoading} error={historyError} open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </main>
   );
+}
+
+function HistoryDrawer({ history, loading, error, open, onClose }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  return <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+    <button type="button" aria-label="Close order history" onClick={onClose} className={`absolute inset-0 h-full w-full bg-ink/20 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`} tabIndex={open ? 0 : -1} />
+    <aside role="dialog" aria-modal="true" aria-labelledby="order-history-title" className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l border-[#e6e2d8] bg-paper p-5 shadow-[-12px_0_40px_rgba(33,59,50,.12)] transition-transform duration-300 sm:p-7 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className="flex items-start justify-between gap-4 border-b border-[#eae7de] pb-5">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-leaf">Past visits</p>
+          <h2 id="order-history-title" className="mt-1 font-display text-2xl text-ink">Order history</h2>
+          <p className="mt-1 text-xs leading-5 text-[#7b8578]">Delivered and cancelled orders, newest first.</p>
+        </div>
+        <button type="button" onClick={onClose} tabIndex={open ? 0 : -1} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e7e3d9] text-[#68746a] transition hover:border-leaf hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss" aria-label="Close order history">
+          <Icon name="close" className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="chat-scroll min-h-0 flex-1 overflow-y-auto py-5">
+        {loading && <p className="text-sm text-[#7a8379]" role="status">Loading order history…</p>}
+        {!loading && error && <p className="rounded-lg border border-[#f0d6ca] bg-[#fff7f3] px-3 py-2.5 text-sm leading-5 text-[#9b5039]" role="alert">{error}</p>}
+        {!loading && !error && history.length === 0 && <div className="rounded-xl bg-[#f5f6f1] p-4 text-sm leading-6 text-[#7a8379]">Completed or cancelled orders will appear here after they leave your current order panel.</div>}
+        {!loading && !error && history.length > 0 && <div className="flex flex-col gap-3">
+          {history.map((item) => <HistoryCard key={item.id} order={item} />)}
+        </div>}
+      </div>
+    </aside>
+  </div>;
+}
+
+function HistoryCard({ order }) {
+  return <article className="rounded-xl border border-[#e8e4da] bg-white p-4 shadow-[0_3px_14px_rgba(36,58,46,.03)]">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#748071]">Order {order.id}</p>
+        <p className="mt-1 text-[11px] text-[#7b8578]">{new Date(order.createdAtUtc).toLocaleString()}</p>
+      </div>
+      <span className="rounded-full bg-[#eef1e9] px-2.5 py-1 text-[10px] font-semibold capitalize text-moss">{order.orderStatus}</span>
+    </div>
+    <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-[#34483d]">{order.summary || 'No item details were saved.'}</p>
+    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#eeeae0] pt-3 text-xs">
+      <div><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#81897f]">Payment</p><p className="mt-1 font-medium capitalize text-[#34483d]">{order.paymentMethod}</p><p className="mt-0.5 leading-5 text-[#7b8578]">{order.paymentStatus}</p></div>
+      <div><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#81897f]">Delivery</p><p className="mt-1 font-medium capitalize text-[#34483d]">{order.deliveryStatus}</p></div>
+    </div>
+  </article>;
 }
 
 function OrderPanel({ order, error, compact = false }) {

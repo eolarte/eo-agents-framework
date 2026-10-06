@@ -1,5 +1,8 @@
 namespace food_ordering.Application;
 
+using Microsoft.Extensions.AI;
+using System.Text.Json.Serialization;
+
 public sealed record CustomerChatRequest(string CustomerId, string Message);
 public sealed record CustomerChatResult(string Response, string OrderStatus);
 public sealed record CustomerOrderSnapshot(
@@ -17,7 +20,55 @@ public sealed record CustomerAgentSet(
     Microsoft.Agents.AI.AIAgent CheckoutPaymentAgent,
     Microsoft.Agents.AI.AIAgent DeliveryAgent,
     Microsoft.Agents.AI.AIAgent OrderStatusAgent,
-    Microsoft.Agents.AI.FileMemoryProvider MemoryProvider);
+    Microsoft.Agents.AI.FileMemoryProvider MemoryProvider,
+    CustomerActionClassifier ActionClassifier);
+
+public sealed class CustomerActionClassifier(IChatClient chatClient, string modelName)
+{
+    public async Task<CustomerActionDecision> ClassifyAsync(
+        string message,
+        bool orderConfirmationPending,
+        bool cancellationConfirmationPending,
+        CancellationToken cancellationToken)
+    {
+        var result = await chatClient.GetResponseAsync<CustomerActionDecision>(
+            [new ChatMessage(ChatRole.User,
+                $"Order confirmation pending: {orderConfirmationPending}. " +
+                $"Cancellation confirmation pending: {cancellationConfirmationPending}. " +
+                $"Customer message: {message}")],
+            new ChatOptions
+            {
+                ModelId = modelName,
+                Instructions = "Choose the action. If cancellation confirmation is pending, classify the reply in " +
+                    "that context: ConfirmCancellation only for a clear yes, RejectCancellation for a clear no, " +
+                    "UnclearCancellationReply if ambiguous, Unrelated if the topic changed. ConfirmOrder only when " +
+                    "an order confirmation is pending. Use RequestCancellation for a new cancellation request, " +
+                    "OrderStatus or OrderHistory when asked, and General otherwise."
+            },
+            cancellationToken: cancellationToken);
+
+        return result.Result;
+    }
+}
+
+public sealed class CustomerActionDecision
+{
+    [JsonConverter(typeof(JsonStringEnumConverter<CustomerAction>))]
+    public CustomerAction Action { get; set; }
+}
+
+public enum CustomerAction
+{
+    General,
+    ConfirmOrder,
+    RequestCancellation,
+    ConfirmCancellation,
+    RejectCancellation,
+    UnclearCancellationReply,
+    OrderStatus,
+    OrderHistory,
+    Unrelated
+}
 
 public interface ICustomerOrderStore
 {
@@ -27,6 +78,7 @@ public interface ICustomerOrderStore
     Task<bool> IsOutForDeliveryAsync(string customerId, string? orderId = null);
     Task<string> GetRecentOrdersAsync(string customerId);
     Task<CustomerOrderSnapshot?> GetCurrentOrderSnapshotAsync(string customerId);
+    Task<IReadOnlyList<CustomerOrderSnapshot>> GetOrderHistorySnapshotsAsync(string customerId);
     Task<bool> HasPendingConfirmationAsync(string customerId);
     Task<string> ConfirmAsync(string customerId);
     Task<string> CancelAsync(string customerId);
@@ -55,6 +107,7 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
     private Microsoft.Agents.AI.AgentSession? session;
     private Microsoft.Agents.AI.AgentSession? orderStatusSession;
     private Microsoft.Agents.AI.AgentSession? deliverySession;
+    private bool cancellationConfirmationPending;
 
     public async Task<CustomerChatResult> SendAsync(string input, CancellationToken cancellationToken)
     {
@@ -65,22 +118,45 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
             using var activity = FoodOrderingTelemetry.ActivitySource.StartActivity("food-ordering.customer-message");
             activity?.SetTag("food_ordering.customer_id", CustomerIdentity.CreateStorageKey(customerId));
 
-            if (IsSimpleConfirmation(input) || IsExplicitOrderConfirmation(input))
+            var orderConfirmationPending = await orders.HasPendingConfirmationAsync(customerId);
+            var decision = await agents.ActionClassifier.ClassifyAsync(
+                input,
+                orderConfirmationPending,
+                cancellationConfirmationPending,
+                cancellationToken);
+
+            if (cancellationConfirmationPending)
             {
-                var hasPendingDraft = await orders.HasPendingConfirmationAsync(customerId);
-                if (hasPendingDraft || IsExplicitOrderConfirmation(input) ||
-                    input.Trim().Equals("confirm", StringComparison.OrdinalIgnoreCase))
+                switch (decision.Action)
                 {
-                    var result = await orders.ConfirmAsync(customerId);
-                    return new CustomerChatResult(result, await orders.GetStatusAsync(customerId));
+                    case CustomerAction.ConfirmCancellation:
+                        cancellationConfirmationPending = false;
+                        var cancellation = await orders.CancelAsync(customerId);
+                        return new CustomerChatResult(cancellation, await orders.GetStatusAsync(customerId));
+                    case CustomerAction.RejectCancellation:
+                        cancellationConfirmationPending = false;
+                        return new CustomerChatResult("Cancellation declined. The order was left unchanged.", await orders.GetStatusAsync(customerId));
+                    case CustomerAction.UnclearCancellationReply:
+                        return new CustomerChatResult("Please confirm or decline the cancellation.", await orders.GetStatusAsync(customerId));
+                    case CustomerAction.Unrelated:
+                        cancellationConfirmationPending = false;
+                        break;
+                    default:
+                        return new CustomerChatResult("Please confirm or decline the cancellation, or ask about something else.", await orders.GetStatusAsync(customerId));
                 }
             }
-            if (input.Equals("cancel", StringComparison.OrdinalIgnoreCase) || input.Equals("no", StringComparison.OrdinalIgnoreCase))
+
+            if (decision.Action == CustomerAction.RequestCancellation)
             {
-                var result = await orders.CancelAsync(customerId);
+                cancellationConfirmationPending = true;
+                return new CustomerChatResult("Do you want me to cancel your order?", await orders.GetStatusAsync(customerId));
+            }
+            if (decision.Action == CustomerAction.ConfirmOrder)
+            {
+                var result = await orders.ConfirmAsync(customerId);
                 return new CustomerChatResult(result, await orders.GetStatusAsync(customerId));
             }
-            if (IsOrderHistoryRequest(input))
+            if (decision.Action == CustomerAction.OrderHistory)
             {
                 var history = await orders.GetRecentOrdersAsync(customerId);
                 orderStatusSession ??= await agents.OrderStatusAgent.CreateSessionAsync(cancellationToken);
@@ -91,7 +167,7 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
                     cancellationToken: cancellationToken);
                 return new CustomerChatResult(historyResponse.ToString(), await orders.GetStatusAsync(customerId));
             }
-            if (IsOrderStatusRequest(input))
+            if (decision.Action == CustomerAction.OrderStatus)
             {
                 var orderId = ExtractOrderId(input);
                 var status = await orders.GetStatusAsync(customerId, orderId);
@@ -110,41 +186,6 @@ internal sealed class CustomerRuntime(string customerId, CustomerAgentSet agents
             return new CustomerChatResult(response.ToString(), await orders.GetStatusAsync(customerId));
         }
         finally { gate.Release(); }
-    }
-
-    private static bool IsOrderStatusRequest(string input)
-    {
-        var message = input.Trim().ToLowerInvariant();
-        return message is "status" or "track" or "track order" or "track my order" or "order status" or "delivery status" ||
-            (message.Contains("status", StringComparison.Ordinal) &&
-             (message.Contains("order", StringComparison.Ordinal) || message.Contains("delivery", StringComparison.Ordinal))) ||
-            message.Contains("where is my order", StringComparison.Ordinal) ||
-            message.Contains("where's my order", StringComparison.Ordinal) ||
-            message.Contains("track my delivery", StringComparison.Ordinal) ||
-            message.Contains("track order", StringComparison.Ordinal) ||
-            message.Contains("check my order", StringComparison.Ordinal);
-    }
-
-    private static bool IsSimpleConfirmation(string input)
-        => input.Trim().Equals("confirm", StringComparison.OrdinalIgnoreCase) ||
-           input.Trim().Equals("yes", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsExplicitOrderConfirmation(string input)
-    {
-        var message = input.Trim().ToLowerInvariant();
-        return (message.Contains("confirm", StringComparison.Ordinal) &&
-                (message.Contains("order", StringComparison.Ordinal) || message.Contains("draft", StringComparison.Ordinal))) ||
-            message.Contains("proceed with the order", StringComparison.Ordinal) ||
-            message.Contains("proceed with this order", StringComparison.Ordinal);
-    }
-
-    private static bool IsOrderHistoryRequest(string input)
-    {
-        var message = input.Trim().ToLowerInvariant();
-        return message.Contains("order history", StringComparison.Ordinal) ||
-            message.Contains("past order", StringComparison.Ordinal) ||
-            message.Contains("previous order", StringComparison.Ordinal) ||
-            message.Contains("my orders", StringComparison.Ordinal);
     }
 
     private static string? ExtractOrderId(string input)

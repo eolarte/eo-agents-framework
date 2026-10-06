@@ -17,6 +17,15 @@ public static class CustomerChatEndpoints
             return Results.Ok(new { order });
         });
 
+        endpoints.MapGet("/api/orders/history", async (string? customerId, ICustomerOrderStore orders) =>
+        {
+            if (string.IsNullOrWhiteSpace(customerId))
+                return Results.BadRequest(new { error = "customerId is required." });
+
+            var history = await orders.GetOrderHistorySnapshotsAsync(customerId.Trim());
+            return Results.Ok(new { orders = history });
+        });
+
         endpoints.MapPost("/api/chat", async (CustomerChatRequest request, CustomerChatService chat, CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.CustomerId) || string.IsNullOrWhiteSpace(request.Message))

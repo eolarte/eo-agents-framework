@@ -100,9 +100,37 @@ public sealed class CustomerOrderStore(IDbContextFactory<CustomerOrderDbContext>
     public async Task<CustomerOrderSnapshot?> GetCurrentOrderSnapshotAsync(string customerId)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync();
-        var result = await FindOrderAsync(db, customerId, orderId: null);
-        if (result.Order is not { } order) return null;
+        var customerKey = CustomerIdentity.CreateStorageKey(customerId);
+        var order = await db.Orders.AsNoTracking()
+            .Include(item => item.Payment)
+            .Include(item => item.Delivery)
+            .Where(item => item.CustomerKey == customerKey &&
+                item.Status != OrderStatus.Delivered &&
+                item.Status != OrderStatus.Cancelled)
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .FirstOrDefaultAsync();
 
+        return order is null ? null : CreateSnapshot(
+            order);
+    }
+
+    public async Task<IReadOnlyList<CustomerOrderSnapshot>> GetOrderHistorySnapshotsAsync(string customerId)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        var customerKey = CustomerIdentity.CreateStorageKey(customerId);
+        var orders = await db.Orders.AsNoTracking()
+            .Include(item => item.Payment)
+            .Include(item => item.Delivery)
+            .Where(item => item.CustomerKey == customerKey &&
+                (item.Status == OrderStatus.Delivered || item.Status == OrderStatus.Cancelled))
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .ToListAsync();
+
+        return orders.Select(CreateSnapshot).ToList();
+    }
+
+    private static CustomerOrderSnapshot CreateSnapshot(CustomerOrder order)
+    {
         return new CustomerOrderSnapshot(
             ShortId(order.Id),
             order.Summary,

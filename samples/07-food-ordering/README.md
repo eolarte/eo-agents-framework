@@ -59,13 +59,17 @@ finish in roughly 30–90 seconds.
 
 Open http://localhost:5000 for the sample customer chat or
 http://localhost:5000/devui for DevUI. Enter a customer name or ID in the chat
-page to keep that customer's memory separate. The order panel shows the latest
-saved order summary and its simulated order, payment, and delivery statuses; it
-refreshes while the chat is open. The read-only
-`GET /api/orders/current?customerId=...` endpoint provides the same persisted
-snapshot. Use different IDs to inspect profiles and orders independently. The
-in-memory vector index is rebuilt from the sample menu and `policies/*.md` on
-startup.
+page to keep that customer's memory separate. The right-side order panel shows
+the customer's current draft or active order and its simulated order, payment,
+and delivery statuses; delivered and cancelled orders move to the responsive
+Order history slide-out. History cards are ordered newest first and include
+their saved summary and status details. The read-only
+`GET /api/orders/current?customerId=...` endpoint provides the current
+non-terminal snapshot, while
+`GET /api/orders/history?customerId=...` returns delivered and cancelled order
+snapshots for the customer. Use different IDs to inspect profiles and orders
+independently. The in-memory vector index is rebuilt from the sample menu and
+`policies/*.md` on startup.
 
 For frontend-only iteration, run `npm run dev` from `samples/07-food-ordering`
 while the ASP.NET sample is running at `http://localhost:5000`. Vite serves the
@@ -73,12 +77,19 @@ React app and proxies `/api` calls to the sample backend. Rebuild the frontend
 with `npm run build` before launching the ASP.NET app to view the production UI.
 
 To draft an order, ask for menu options, select items, and specify `demo-card`
-or `cash`. Then reply `confirm` or `cancel`; use `status` to inspect the latest
-active order. Each draft receives an order ID, which can be included in a status
-question to inspect an older order. Confirmed orders progress through preparing,
-ready, out for delivery, and delivered. `demo-card` records a simulated approval
-only; `cash` remains due on delivery and is never recorded as collected. These
-statuses do not contact a restaurant, payment processor, or delivery service.
+or `cash`. Then reply `confirm` to place the simulated order. To cancel the
+latest eligible draft or active order, ask in natural language. The assistant
+will ask for confirmation before changing the order; confirm or decline in
+free text. An unclear reply prompts for clarification, and changing the subject
+cancels the pending cancellation request without changing the order. A confirmed
+cancellation updates local payment and delivery statuses without contacting an
+external service.
+Use `status` to inspect the latest active order. Each draft receives an order ID,
+which can be included in a status question to inspect an older order. Confirmed
+orders progress through preparing, ready, out for delivery, and delivered.
+`demo-card` records a simulated approval only; `cash` remains due on delivery
+and is never recorded as collected. These statuses do not contact a restaurant,
+payment processor, or delivery service.
 
 ## Aspire Dashboard telemetry
 
