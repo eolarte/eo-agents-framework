@@ -31,7 +31,6 @@ export default function App() {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [orderStatus, setOrderStatus] = useState('');
   const [order, setOrder] = useState(null);
   const [orderError, setOrderError] = useState('');
   const [history, setHistory] = useState([]);
@@ -104,7 +103,6 @@ export default function App() {
   function changeCustomerId(value) {
     setCustomerId(value);
     setMessages(initialMessage());
-    setOrderStatus('');
     setOrder(null);
     setOrderError('');
     setHistory([]);
@@ -174,7 +172,6 @@ export default function App() {
       if (!response.ok) throw new Error(data?.error || 'The chat could not complete your request. Please try again.');
       if (typeof data?.response !== 'string') throw new Error('The chat returned an unexpected response. Please try again.');
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', text: data.response }]);
-      setOrderStatus(typeof data.orderStatus === 'string' ? data.orderStatus : '');
       await Promise.all([refreshOrder(id), refreshHistory(id)]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Something went wrong. Please try again.');
@@ -252,10 +249,6 @@ export default function App() {
 
             <div className="border-t border-[#eeeae0] bg-[#fffefa] px-4 py-4 sm:px-8 sm:py-5">
               <div className="mx-auto max-w-3xl">
-                {orderStatus && <details className="mb-3 rounded-lg bg-[#f1f5ee] px-3 py-2 text-xs leading-5 text-[#50694f]">
-                  <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss">Order update</summary>
-                  <p className="mt-1 break-words [overflow-wrap:anywhere]">{orderStatus}</p>
-                </details>}
                 {error && <div className="mb-3 flex min-w-0 items-start gap-2 rounded-lg border border-[#f0d6ca] bg-[#fff7f3] px-3 py-2.5 text-sm text-[#9b5039]" role="alert"><span aria-hidden="true">!</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span></div>}
                 <form onSubmit={handleSubmit} className="rounded-2xl border border-[#e4e1d7] bg-white p-2 shadow-[0_3px_16px_rgba(36,58,46,.04)] transition focus-within:border-[#a8b69f] focus-within:ring-2 focus-within:ring-leaf/15">
                   <label htmlFor="message" className="sr-only">Message Olive and Ember</label>
