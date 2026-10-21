@@ -49,6 +49,63 @@ public sealed class DestinationSearchTests
         Assert.Empty(results);
     }
 
+    [Fact]
+    public async Task Resolve_uses_provider_id_and_ignores_client_supplied_location()
+    {
+        using var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":2988507,"name":"Paris","latitude":48.8566,"longitude":2.3522,"timezone":"Europe/Paris","country":"France","admin1":"Île-de-France"}
+            """));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://geocoding-api.open-meteo.com/") };
+        var resolver = new OpenMeteoGeocodingClient(httpClient);
+
+        var destination = await resolver.ResolveAsync("open-meteo:2988507", CancellationToken.None);
+
+        Assert.NotNull(destination);
+        Assert.Equal("open-meteo:2988507", destination.Id);
+        Assert.Equal(48.8566, destination.Latitude);
+        Assert.Equal("Europe/Paris", destination.Timezone);
+        Assert.Equal("/v1/get?id=2988507", handler.LastRequestUri!.PathAndQuery);
+    }
+
+    [Theory]
+    [InlineData("geo-paris")]
+    [InlineData("open-meteo:-1")]
+    [InlineData("open-meteo:0001")]
+    [InlineData("open-meteo:123?latitude=0")]
+    public async Task Resolve_rejects_invalid_id_without_provider_call(string id)
+    {
+        using var handler = new StubHttpMessageHandler(_ => throw new InvalidOperationException("Provider should not be called."));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://geocoding-api.open-meteo.com/") };
+        var resolver = new OpenMeteoGeocodingClient(httpClient);
+
+        Assert.Null(await resolver.ResolveAsync(id, CancellationToken.None));
+        Assert.Null(handler.LastRequestUri);
+    }
+
+    [Fact]
+    public async Task Resolve_rejects_provider_response_with_different_id()
+    {
+        using var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":42,"name":"Other","latitude":48.8566,"longitude":2.3522,"timezone":"Europe/Paris"}
+            """));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://geocoding-api.open-meteo.com/") };
+        var resolver = new OpenMeteoGeocodingClient(httpClient);
+
+        Assert.Null(await resolver.ResolveAsync("open-meteo:2988507", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Resolve_rejects_missing_coordinates()
+    {
+        using var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":2988507,"name":"Paris","timezone":"Europe/Paris"}
+            """));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://geocoding-api.open-meteo.com/") };
+        var resolver = new OpenMeteoGeocodingClient(httpClient);
+
+        Assert.Null(await resolver.ResolveAsync("open-meteo:2988507", CancellationToken.None));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

@@ -14,7 +14,7 @@ function Icon({ name, size = 20 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function DestinationPage() {
+export default function DestinationPage({ onContinue }) {
   const inputRef = useRef(null);
   const {
     query, selected, search, activeIndex, showResults, status,
@@ -127,6 +127,7 @@ export default function DestinationPage() {
             ) : (
               <div className="tip-card"><span className="tip-icon">✳</span><p><strong>A little detail helps.</strong> Places often share a name. Check the region and country before you choose.</p></div>
             )}
+            {selected && <button type="button" className="primary-action destination-continue" onClick={() => onContinue(selected)}>Continue to trip preferences →</button>}
           </div>
           <div className="panel-footer"><span><span className="footer-dot" /> Ready when you are</span><span>DESTINATION DATA VIA <a href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noreferrer">OPEN-METEO</a>, BASED ON <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GEONAMES</a></span></div>
         </section>

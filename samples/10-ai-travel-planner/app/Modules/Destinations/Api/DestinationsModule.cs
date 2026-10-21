@@ -7,11 +7,13 @@ public static class DestinationsModule
 {
     public static IServiceCollection AddDestinationsModule(this IServiceCollection services)
     {
-        services.AddHttpClient<IDestinationSearchService, OpenMeteoGeocodingClient>(client =>
+        services.AddHttpClient<OpenMeteoGeocodingClient>(client =>
         {
             client.BaseAddress = new Uri("https://geocoding-api.open-meteo.com/");
             client.Timeout = TimeSpan.FromSeconds(10);
         });
+        services.AddTransient<IDestinationSearchService>(provider => provider.GetRequiredService<OpenMeteoGeocodingClient>());
+        services.AddTransient<IDestinationResolver>(provider => provider.GetRequiredService<OpenMeteoGeocodingClient>());
 
         return services;
     }

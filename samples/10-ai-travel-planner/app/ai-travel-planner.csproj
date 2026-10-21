@@ -7,6 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="../knowledge/*.md"
+                      Exclude="../knowledge/README.md"
+                      LogicalName="ai_travel_planner.Knowledge.%(Filename)%(Extension)" />
     <Content Update="wwwroot/customer-ui/**/*" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.23.0" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.23.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.0" />
+    <EmbeddedResource Include="Modules/TravelPlans/Infrastructure/Prompts/AdvisorPromptV1.txt"
+                      LogicalName="ai_travel_planner.Modules.TravelPlans.AdvisorPromptV1.txt" />
   </ItemGroup>
 </Project>
