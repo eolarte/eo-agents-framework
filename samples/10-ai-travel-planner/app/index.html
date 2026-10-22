@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f1ea" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      (() => {
+        let savedTheme;
+        try {
+          savedTheme = localStorage.getItem('wayfinder-theme');
+        } catch {
+          // Use the system preference when browser storage is unavailable.
+        }
+        const darkMode = savedTheme === 'dark' || (savedTheme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', darkMode);
+        document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light';
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', darkMode ? '#171717' : '#ffffff');
+      })();
+    </script>
     <meta name="description" content="Find and choose the right destination for your next trip." />
     <title>Wayfinder — Choose your destination</title>
   </head>
