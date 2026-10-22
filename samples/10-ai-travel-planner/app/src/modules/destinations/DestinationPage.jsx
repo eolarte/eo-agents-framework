@@ -1,18 +1,16 @@
 import { useRef } from 'react';
+import { ArrowRight, Check, Globe2, Info, MapPin, Search, X } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
+import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import { useDestinationSearch } from './useDestinationSearch.js';
 import { coordinate, placeDetails } from './destinationFormat.js';
-
-function Icon({ name, size = 20 }) {
-  const paths = {
-    search: <><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></>,
-    arrow: <><path d="M4 12h16m-6-6 6 6-6 6" /></>,
-    pin: <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.2" /></>,
-    globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.6 2.5 4 5.5 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.5-4-9s1.4-6.5 4-9Z" /></>,
-    close: <><path d="M5 5 19 19M19 5 5 19" /></>,
-    check: <><path d="m4 12 5 5L20 6" /></>,
-  };
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
-}
 
 export default function DestinationPage({ onContinue }) {
   const inputRef = useRef(null);
@@ -27,40 +25,30 @@ export default function DestinationPage({ onContinue }) {
     inputRef.current?.focus();
   }
 
+  const isLoading = search.kind === 'loading' && !selected;
+  const isError = search.kind === 'error' && !selected;
+  const isEmpty = search.kind === 'ready' && search.destinations.length === 0 && !selected;
+
   return (
-    <main id="main" className="main-layout">
-        <section className="intro" aria-labelledby="page-title">
-          <div className="intro-copy">
-            <p className="eyebrow"><span className="eyebrow-line" /> YOUR NEXT CHAPTER</p>
-            <h1 id="page-title">It starts with<br /><em>a place.</em></h1>
-            <p className="intro-description">Find the destination you have in mind. We’ll help you pick the right place when names look alike.</p>
-          </div>
-          <div className="route-art" aria-hidden="true">
-            <div className="art-grid" />
-            <span className="art-circle art-circle-one" /><span className="art-circle art-circle-two" />
-            <svg className="art-route" viewBox="0 0 480 280" preserveAspectRatio="none"><path d="M32 225 C125 215 122 100 210 124 S316 214 448 42" /></svg>
-            <span className="art-point art-point-one"><span /></span>
-            <span className="art-point art-point-two"><span /></span>
-            <span className="art-point art-point-three"><span /></span>
-            <span className="art-label art-label-one">BEGIN HERE</span>
-            <span className="art-label art-label-two">GO ANYWHERE</span>
-            <span className="art-cross">✳</span>
-          </div>
-          <p className="intro-footnote">01 <span /> CHOOSE YOUR DESTINATION</p>
-        </section>
+    <main id="main" className="mx-auto grid w-full max-w-5xl gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12 lg:px-8 lg:py-20">
+      <section aria-labelledby="page-title" className="flex flex-col gap-4 lg:pt-8">
+        <Badge variant="secondary" className="w-fit">Step 1 of 3 · Destination</Badge>
+        <h1 id="page-title" className="text-3xl font-semibold tracking-tight sm:text-4xl">Where would you like to go?</h1>
+        <p className="max-w-md text-muted-foreground">Find the destination you have in mind. Check the region and country when places share a name.</p>
+      </section>
 
-        <section className="search-panel" aria-labelledby="search-title">
-          <div className="panel-topline"><span>DESTINATION SEARCH</span><span>01 / 01</span></div>
-          <div className="panel-content">
-            <div className="panel-heading"><span className="heading-icon"><Icon name="globe" size={24} /></span><p>First, find your place</p></div>
-            <h2 id="search-title">Where would you<br />like to go?</h2>
-            <p className="search-description">Search by city or place name, then choose the location that matches your trip.</p>
-
-            <div className="field-group">
-              <label htmlFor="destination-search">DESTINATION</label>
-              <div className={`search-field ${selected ? 'is-selected' : ''}`}>
-                <Icon name="search" size={21} />
-                <input
+      <Card aria-labelledby="search-title" className="min-w-0">
+        <CardHeader>
+          <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-muted text-muted-foreground" aria-hidden="true"><Globe2 className="size-5" /></div>
+          <CardTitle id="search-title">Choose a destination</CardTitle>
+          <CardDescription>Search by city or place name, then select the location that matches your trip.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="destination-search">Destination</FieldLabel>
+              <InputGroup>
+                <InputGroupInput
                   ref={inputRef}
                   id="destination-search"
                   type="text"
@@ -79,58 +67,90 @@ export default function DestinationPage({ onContinue }) {
                   aria-activedescendant={showResults && activeIndex >= 0 ? `destination-option-${activeIndex}` : undefined}
                   aria-describedby="search-help search-status"
                 />
-                {selected && <button className="clear-button" type="button" onMouseDown={(event) => event.preventDefault()} onClick={clearAndFocus} aria-label="Clear selected destination"><Icon name="close" size={17} /></button>}
+                <InputGroupAddon align="inline-start"><Search aria-hidden="true" /></InputGroupAddon>
+                {selected && (
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton size="icon-xs" type="button" onMouseDown={(event) => event.preventDefault()} onClick={clearAndFocus} aria-label="Clear selected destination"><X aria-hidden="true" /></InputGroupButton>
+                  </InputGroupAddon>
+                )}
+              </InputGroup>
+              <FieldDescription id="search-help">Use a city or town name. Add more letters to narrow the results.</FieldDescription>
+            </Field>
+          </FieldGroup>
+
+          {showResults && (
+            <div className="max-h-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
+              <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Matching places · {search.destinations.length} found</p>
+              <div id="destination-results" role="listbox" aria-label="Matching destinations">
+                {search.destinations.map((destination, index) => (
+                  <div
+                    id={`destination-option-${index}`}
+                    key={destination.id}
+                    role="option"
+                    aria-selected={activeIndex === index}
+                    className={cn('flex cursor-pointer items-center gap-3 rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground', activeIndex === index && 'bg-accent text-accent-foreground')}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectDestination(destination)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                  >
+                    <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className="flex min-w-0 flex-1 flex-col"><span className="font-medium">{destination.name}</span><span className="truncate text-xs text-muted-foreground">{placeDetails(destination)}</span></span>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </div>
+                ))}
               </div>
-              <p id="search-help" className="field-help">Use a city or town name. Add more letters to narrow the results.</p>
-
-              {showResults && (
-                <div className="results-list" id="destination-results" role="listbox" aria-label="Matching destinations">
-                  <div className="results-heading">MATCHING PLACES <span>{search.destinations.length} FOUND</span></div>
-                  {search.destinations.map((destination, index) => (
-                    <div
-                      id={`destination-option-${index}`}
-                      key={destination.id}
-                      className={`result-option ${activeIndex === index ? 'is-active' : ''}`}
-                      role="option"
-                      aria-selected={activeIndex === index}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => selectDestination(destination)}
-                      onMouseEnter={() => setActiveIndex(index)}
-                    >
-                      <span className="result-pin"><Icon name="pin" size={18} /></span>
-                      <span className="result-text"><strong>{destination.name}</strong><small>{placeDetails(destination)}</small></span>
-                      <Icon name="arrow" size={17} />
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+          )}
 
-            <div id="search-status" className={`search-status status-${search.kind}`} role="status" aria-live="polite">
-              {search.kind === 'loading' && !selected && <span className="status-spinner" aria-hidden="true" />}
-              {search.kind === 'error' && !selected && <span className="status-symbol" aria-hidden="true">!</span>}
-              {status}
-              {search.kind === 'error' && !selected && <button type="button" className="retry-button" onClick={retrySearch}>Try again</button>}
-            </div>
-
-            {selected ? (
-              <div className="selection-card" aria-label="Selected destination">
-                <div className="selection-title"><span className="selection-check"><Icon name="check" size={16} /></span><span>DESTINATION SELECTED</span></div>
-                <h3>{selected.name}</h3>
-                <p className="selection-place">{placeDetails(selected)}</p>
-                <dl className="selection-details">
-                  <div><dt>LOCATION ID</dt><dd>{selected.id}</dd></div>
-                  <div><dt>COORDINATES</dt><dd>{coordinate(selected.latitude, 'N', 'S')} · {coordinate(selected.longitude, 'E', 'W')}</dd></div>
-                  <div><dt>TIME ZONE</dt><dd>{selected.timezone}</dd></div>
-                </dl>
-              </div>
-            ) : (
-              <div className="tip-card"><span className="tip-icon">✳</span><p><strong>A little detail helps.</strong> Places often share a name. Check the region and country before you choose.</p></div>
-            )}
-            {selected && <button type="button" className="primary-action destination-continue" onClick={() => onContinue(selected)}>Continue to trip preferences →</button>}
+          <div id="search-status" role="status" aria-live="polite" className="flex items-center gap-2 text-sm text-muted-foreground">
+            {isLoading && <Spinner aria-hidden="true" />}
+            <span>{status}</span>
           </div>
-          <div className="panel-footer"><span><span className="footer-dot" /> Ready when you are</span><span>DESTINATION DATA VIA <a href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noreferrer">OPEN-METEO</a>, BASED ON <a href="https://www.geonames.org/" target="_blank" rel="noreferrer">GEONAMES</a></span></div>
-        </section>
+
+          {isError && (
+            <Alert variant="destructive">
+              <AlertTitle>Search unavailable</AlertTitle>
+              <AlertDescription className="flex flex-wrap items-center gap-2">Please try again. <Button variant="outline" size="sm" type="button" onClick={retrySearch}>Try again</Button></AlertDescription>
+            </Alert>
+          )}
+
+          {isEmpty && (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>No matching destinations</EmptyTitle>
+                <EmptyDescription>Try another spelling or a nearby city.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+
+          {selected ? (
+            <Card aria-label="Selected destination" className="bg-muted/40 shadow-none">
+              <CardHeader>
+                <Badge variant="secondary" className="w-fit"><Check aria-hidden="true" /> Destination selected</Badge>
+                <CardTitle>{selected.name}</CardTitle>
+                <CardDescription>{placeDetails(selected)}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                  <div><dt className="text-muted-foreground">Location ID</dt><dd className="font-medium">{selected.id}</dd></div>
+                  <div><dt className="text-muted-foreground">Coordinates</dt><dd className="font-medium">{coordinate(selected.latitude, 'N', 'S')} · {coordinate(selected.longitude, 'E', 'W')}</dd></div>
+                  <div><dt className="text-muted-foreground">Time zone</dt><dd className="font-medium">{selected.timezone}</dd></div>
+                </dl>
+              </CardContent>
+            </Card>
+          ) : !isEmpty && !isError && (
+            <Alert>
+              <Info aria-hidden="true" />
+              <AlertTitle>A little detail helps</AlertTitle>
+              <AlertDescription>Places often share a name. Check the region and country before you choose.</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+        <CardFooter className="flex flex-col items-start gap-4 border-t pt-6">
+          {selected && <Button className="w-full sm:w-auto" type="button" onClick={() => onContinue(selected)}>Continue to trip preferences <ArrowRight data-icon="inline-end" aria-hidden="true" /></Button>}
+          <p className="text-xs text-muted-foreground">Destination data via <a className="underline underline-offset-4 hover:text-foreground" href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noreferrer">Open-Meteo</a>, based on <a className="underline underline-offset-4 hover:text-foreground" href="https://www.geonames.org/" target="_blank" rel="noreferrer">GeoNames</a>.</p>
+        </CardFooter>
+      </Card>
     </main>
   );
 }

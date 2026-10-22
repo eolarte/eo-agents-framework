@@ -1,4 +1,14 @@
 import { useState } from 'react';
+import { ArrowLeft, ArrowRight, MapPin } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const DAY_MS = 86400000;
 
@@ -33,11 +43,12 @@ const INITIAL = {
 };
 
 function ChoiceGroup({ legend, name, value, options, onChange }) {
-  return <fieldset className="choice-group"><legend>{legend}</legend><div className="choice-options">
-    {options.map(([option, label]) => <label key={option} className={value === option ? 'is-checked' : ''}>
-      <input type="radio" name={name} value={option} checked={value === option} onChange={() => onChange(option)} />{label}
-    </label>)}
-  </div></fieldset>;
+  return <FieldSet>
+    <FieldLegend variant="label" id={`${name}-legend`}>{legend}</FieldLegend>
+    <FieldGroup><ToggleGroup type="single" value={value} onValueChange={(next) => { if (next) onChange(next); }} aria-labelledby={`${name}-legend`} variant="outline" spacing={2} className="flex flex-wrap justify-start">
+      {options.map(([option, label]) => <ToggleGroupItem key={option} value={option} aria-label={label}>{label}</ToggleGroupItem>)}
+    </ToggleGroup></FieldGroup>
+  </FieldSet>;
 }
 
 export default function PreferencesPage({ destination, initialRequest, onBack, onSubmit, submitting, submitError }) {
@@ -70,35 +81,71 @@ export default function PreferencesPage({ destination, initialRequest, onBack, o
     });
   }
 
-  function fieldError(name) { return hasError(name) ? <p className="form-error" id={`${name}-error`}>{errors[name]}</p> : null; }
+  function fieldError(name) { return hasError(name) ? <FieldError id={`${name}-error`}>{errors[name]}</FieldError> : null; }
 
-  return <main id="main" className="flow-main">
-    <div className="flow-topline"><span>TRIP PREFERENCES</span><span>02 / 03</span></div>
-    <div className="flow-content">
-      <button className="text-action" type="button" onClick={onBack}>← Change destination</button>
-      <p className="eyebrow"><span className="eyebrow-line" /> MAKE IT YOURS</p>
-      <h1 id="page-title" tabIndex="-1">Tell us about<br /><em>your trip.</em></h1>
-      <p className="flow-lede">We’ll research conditions and places around your selected destination.</p>
-      <div className="destination-summary"><span>DESTINATION</span><strong>{destination.name}</strong><small>{[destination.region, destination.country].filter(Boolean).join(', ')}</small></div>
-      <form onSubmit={submit} noValidate>
-        <div className="form-grid">
-          <div className="form-field"><label htmlFor="startDate">Start date</label><input id="startDate" type="date" required value={values.startDate} onChange={(e) => set('startDate', e.target.value)} onBlur={() => touch('startDate')} aria-invalid={hasError('startDate')} aria-describedby={hasError('startDate') ? 'startDate-error' : undefined} />{fieldError('startDate')}</div>
-          <div className="form-field"><label htmlFor="endDate">End date</label><input id="endDate" type="date" required value={values.endDate} onChange={(e) => set('endDate', e.target.value)} onBlur={() => touch('endDate')} aria-invalid={hasError('endDate')} aria-describedby={hasError('endDate') ? 'endDate-error' : undefined} />{fieldError('endDate')}</div>
-        </div>
-        <p className="form-hint">Trips can be 1–14 days. Past and distant dates use historical weather estimates.</p>
-        <div className="form-field"><label htmlFor="interests">Interests <span className="optional">optional</span></label><textarea id="interests" rows="2" value={values.interests} onChange={(e) => set('interests', e.target.value)} onBlur={() => touch('interests')} placeholder="Museums, food, architecture" aria-invalid={hasError('interests')} aria-describedby={`interests-help${hasError('interests') ? ' interests-error' : ''}`} /><p id="interests-help" className="form-hint">Separate with commas. Up to 12 interests, 40 characters each.</p>{fieldError('interests')}</div>
-        <ChoiceGroup legend="Pace" name="pace" value={values.pace} onChange={(value) => set('pace', value)} options={[["relaxed", "Relaxed"], ["moderate", "Moderate"], ["intensive", "Intensive"]]} />
-        <ChoiceGroup legend="Transport" name="transport" value={values.transportMode} onChange={(value) => set('transportMode', value)} options={[["walking", "Walking"], ["transit", "Transit"], ["driving", "Driving"]]} />
-        <ChoiceGroup legend="Budget" name="budget" value={values.budgetLevel} onChange={(value) => set('budgetLevel', value)} options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} />
-        <label className="checkbox-field"><input type="checkbox" checked={values.avoidCrowds} onChange={(e) => set('avoidCrowds', e.target.checked)} /><span>Avoid crowds where possible</span></label>
-        <div className="form-grid">
-          <div className="form-field"><label htmlFor="dailyStartTime">Daily start time</label><input id="dailyStartTime" type="time" value={values.dailyStartTime} onChange={(e) => set('dailyStartTime', e.target.value)} onBlur={() => touch('dailyStartTime')} aria-invalid={hasError('dailyStartTime')} aria-describedby={hasError('dailyStartTime') ? 'dailyStartTime-error' : undefined} />{fieldError('dailyStartTime')}</div>
-          <div className="form-field"><label htmlFor="dailyEndTime">Daily end time</label><input id="dailyEndTime" type="time" value={values.dailyEndTime} onChange={(e) => set('dailyEndTime', e.target.value)} onBlur={() => touch('dailyEndTime')} aria-invalid={hasError('dailyEndTime')} aria-describedby={hasError('dailyEndTime') ? 'dailyEndTime-error' : undefined} />{fieldError('dailyEndTime')}</div>
-        </div>
-        {attempted && !valid && <p className="form-summary" role="alert">Review the highlighted fields before starting.</p>}
-        {submitError && <p className="form-summary" role="alert">{submitError}</p>}
-        <button className="primary-action" type="submit" disabled={!valid || submitting}>{submitting ? 'Starting assessment…' : 'Assess my trip →'}</button>
-      </form>
+  return <main id="main" className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <div className="mb-8 flex items-center justify-between text-sm text-muted-foreground"><span>Trip preferences</span><span>Step 2 of 3</span></div>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" type="button" onClick={onBack} className="self-start"><ArrowLeft data-icon="inline-start" />Change destination</Button>
+        <h1 id="page-title" tabIndex="-1" className="text-3xl font-semibold tracking-tight sm:text-4xl">Tell us about your trip</h1>
+        <p className="text-muted-foreground">We’ll research conditions and places around your selected destination.</p>
+      </div>
+      <Card>
+        <CardHeader><CardDescription>Destination</CardDescription><CardTitle className="flex items-center gap-2"><MapPin className="size-5" aria-hidden="true" />{destination.name}</CardTitle></CardHeader>
+        {[destination.region, destination.country].filter(Boolean).length > 0 && <CardContent className="text-sm text-muted-foreground">{[destination.region, destination.country].filter(Boolean).join(', ')}</CardContent>}
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Plan your days</CardTitle><CardDescription>Trips can be 1–14 days. Past and distant dates use historical weather estimates.</CardDescription></CardHeader>
+        <CardContent>
+          <form onSubmit={submit} noValidate className="flex flex-col gap-8">
+            <FieldGroup>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field data-invalid={hasError('startDate') || undefined}>
+                  <FieldLabel htmlFor="startDate">Start date</FieldLabel>
+                  <Input id="startDate" type="date" required value={values.startDate} onChange={(e) => set('startDate', e.target.value)} onBlur={() => touch('startDate')} aria-invalid={hasError('startDate')} aria-describedby={hasError('startDate') ? 'startDate-error' : undefined} />
+                  {fieldError('startDate')}
+                </Field>
+                <Field data-invalid={hasError('endDate') || undefined}>
+                  <FieldLabel htmlFor="endDate">End date</FieldLabel>
+                  <Input id="endDate" type="date" required value={values.endDate} onChange={(e) => set('endDate', e.target.value)} onBlur={() => touch('endDate')} aria-invalid={hasError('endDate')} aria-describedby={hasError('endDate') ? 'endDate-error' : undefined} />
+                  {fieldError('endDate')}
+                </Field>
+              </div>
+              <Field data-invalid={hasError('interests') || undefined}>
+                <FieldLabel htmlFor="interests">Interests <span className="font-normal text-muted-foreground">(optional)</span></FieldLabel>
+                <Textarea id="interests" rows={3} value={values.interests} onChange={(e) => set('interests', e.target.value)} onBlur={() => touch('interests')} placeholder="Museums, food, architecture" aria-invalid={hasError('interests')} aria-describedby={`interests-help${hasError('interests') ? ' interests-error' : ''}`} />
+                <FieldDescription id="interests-help">Separate with commas. Up to 12 interests, 40 characters each.</FieldDescription>
+                {fieldError('interests')}
+              </Field>
+            </FieldGroup>
+            <FieldGroup>
+              <ChoiceGroup legend="Pace" name="pace" value={values.pace} onChange={(value) => set('pace', value)} options={[["relaxed", "Relaxed"], ["moderate", "Moderate"], ["intensive", "Intensive"]]} />
+              <ChoiceGroup legend="Transport" name="transport" value={values.transportMode} onChange={(value) => set('transportMode', value)} options={[["walking", "Walking"], ["transit", "Transit"], ["driving", "Driving"]]} />
+              <ChoiceGroup legend="Budget" name="budget" value={values.budgetLevel} onChange={(value) => set('budgetLevel', value)} options={[["low", "Low"], ["medium", "Medium"], ["high", "High"]]} />
+              <FieldSet>
+                <FieldLegend variant="label">Crowds</FieldLegend>
+                <FieldGroup><Field orientation="horizontal"><Checkbox id="avoidCrowds" checked={values.avoidCrowds} onCheckedChange={(checked) => set('avoidCrowds', checked === true)} /><FieldLabel htmlFor="avoidCrowds" className="font-normal">Avoid crowds where possible</FieldLabel></Field></FieldGroup>
+              </FieldSet>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field data-invalid={hasError('dailyStartTime') || undefined}>
+                  <FieldLabel htmlFor="dailyStartTime">Daily start time</FieldLabel>
+                  <Input id="dailyStartTime" type="time" value={values.dailyStartTime} onChange={(e) => set('dailyStartTime', e.target.value)} onBlur={() => touch('dailyStartTime')} aria-invalid={hasError('dailyStartTime')} aria-describedby={hasError('dailyStartTime') ? 'dailyStartTime-error' : undefined} />
+                  {fieldError('dailyStartTime')}
+                </Field>
+                <Field data-invalid={hasError('dailyEndTime') || undefined}>
+                  <FieldLabel htmlFor="dailyEndTime">Daily end time</FieldLabel>
+                  <Input id="dailyEndTime" type="time" value={values.dailyEndTime} onChange={(e) => set('dailyEndTime', e.target.value)} onBlur={() => touch('dailyEndTime')} aria-invalid={hasError('dailyEndTime')} aria-describedby={hasError('dailyEndTime') ? 'dailyEndTime-error' : undefined} />
+                  {fieldError('dailyEndTime')}
+                </Field>
+              </div>
+            </FieldGroup>
+            {attempted && !valid && <Alert variant="destructive" role="alert"><AlertTitle>Review your trip details</AlertTitle><AlertDescription>Review the highlighted fields before starting.</AlertDescription></Alert>}
+            {submitError && <Alert variant="destructive" role="alert"><AlertTitle>Assessment could not start</AlertTitle><AlertDescription>{submitError}</AlertDescription></Alert>}
+            <Button type="submit" disabled={submitting} className="self-start">{submitting ? <><Spinner data-icon="inline-start" />Starting assessment…</> : <>Assess my trip<ArrowRight data-icon="inline-end" /></>}</Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   </main>;
 }
