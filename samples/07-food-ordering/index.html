@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f7f5ef" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      (() => {
+        let savedTheme;
+        try {
+          savedTheme = localStorage.getItem('olive-ember-theme');
+        } catch {
+          // System preference still works when storage is unavailable.
+        }
+        const darkMode = savedTheme === 'dark' || (savedTheme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', darkMode);
+        document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light';
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', darkMode ? '#171717' : '#ffffff');
+      })();
+    </script>
     <meta name="description" content="A friendly demo for discovering the menu, building an order, and checking its status." />
     <title>Olive &amp; Ember — Guest table</title>
   </head>
