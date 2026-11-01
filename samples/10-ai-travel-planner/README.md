@@ -142,6 +142,8 @@ dotnet run --project samples/10-ai-travel-planner/app/ai-travel-planner.csproj -
 Open http://localhost:5000. Select a destination, set preferences, and start
 an assessment. The UI shows five agent statuses. It then shows Advisor
 recommendations and the available evidence.
+The attractions section can switch between a list and a Google Map with a
+marker for each returned place.
 
 For frontend work, run `npm run dev` in `app/`. Vite sends `/api` requests to
 the server on port 5000. Build the site again to view frontend changes through
@@ -150,6 +152,17 @@ ASP.NET Core.
 Set `GOOGLE_PLACES_API_KEY` in the server environment to get live attractions.
 The key needs Places API (New) access and billing. If the key is absent, the
 attractions route returns HTTP 503. If the provider fails, it returns HTTP 502.
+To use the map view, enable the Maps JavaScript API and billing in Google Cloud.
+The map reuses `GOOGLE_PLACES_API_KEY`; set it in the environment for both the
+ASP.NET Core process and the Vite dev/build process. The sample uses Google's
+`DEMO_MAP_ID` for advanced markers by default. For deployment, create a
+JavaScript map ID and set `VITE_GOOGLE_MAPS_MAP_ID` for Vite, for example in
+`app/.env.local`. Vite embeds the shared key in browser code. A single key
+used by the server and browser cannot have both server IP and website referrer
+application restrictions; if using one key, restrict its API access to Places
+API (New) and Maps JavaScript API and understand that its value is public.
+The map loads when selected; the list remains available without the key in the
+frontend build. Rebuild the frontend after changing the key or map ID.
 Open-Meteo weather and geocoding do not need a key. See `app/.env.example` for
 the variable names. Do not put keys in the repository.
 

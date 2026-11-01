@@ -8,3 +8,7 @@
 # Frontend dependencies and generated assets.
 **/node_modules/
 **/wwwroot/customer-ui/
+
+# Local frontend configuration can contain browser and server credentials.
+**/.env.local
+**/.env.*.local

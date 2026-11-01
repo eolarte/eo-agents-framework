@@ -5,6 +5,7 @@ import path from 'node:path';
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
+  envPrefix: ['VITE_', 'GOOGLE_PLACES_API_KEY'],
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

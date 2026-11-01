@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { ArrowLeft, ArrowUpRight, ChevronDown, CircleCheck, CircleX, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowUpRight, ChevronDown, CircleCheck, CircleX, List, Map, MapPin } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import AttractionMap from './AttractionMap';
 
 const AGENTS = [
   ['weather', 'Weather'], ['attractions', 'Attractions'], ['seasonality', 'Seasonality'],
@@ -97,9 +99,13 @@ function Seasonality({ research }) {
 }
 
 function Attractions({ research }) {
+  const [view, setView] = useState('list');
   return <Section title="Nearby attractions" research={research}>
     {research?.data?.length > 0 && <p className="text-sm text-muted-foreground">Place results provided by <span className="font-medium text-foreground" translate="no">Google Maps</span></p>}
-    {research?.data?.length ? <ol className="grid gap-3 sm:grid-cols-2">{research.data.map((place) => <li key={place.id}><Card className="h-full"><CardHeader><CardTitle className="text-base">{place.name}</CardTitle><CardDescription>{place.categories?.join(' · ') || 'Category unavailable'}</CardDescription></CardHeader><CardContent className="flex flex-col gap-1 text-sm text-muted-foreground"><p>Coordinates: {place.latitude}, {place.longitude}</p><p>Type and distance score: {typeof place.score === 'number' ? place.score.toFixed(2) : 'Unavailable'}</p><p>Source: {place.source?.provider || 'Google Places'} {place.source?.providerId || ''}</p></CardContent></Card></li>)}</ol> : <p className="text-sm text-muted-foreground">{research?.status === 'failed' ? 'Attraction search failed. See the provider warning below.' : 'No matching nearby attractions were returned.'}</p>}
+    {research?.data?.length ? <>
+      <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-medium">{research.data.length} nearby {research.data.length === 1 ? 'place' : 'places'}</p><ToggleGroup type="single" value={view} onValueChange={(value) => { if (value) setView(value); }} variant="outline" size="sm" spacing={0} aria-label="Attraction view"><ToggleGroupItem value="list" aria-label="List view"><List data-icon="inline-start" />List</ToggleGroupItem><ToggleGroupItem value="map" aria-label="Map view"><Map data-icon="inline-start" />Map</ToggleGroupItem></ToggleGroup></div>
+      {view === 'map' ? <AttractionMap places={research.data} /> : <ol className="grid gap-3 sm:grid-cols-2">{research.data.map((place) => <li key={place.id}><Card className="h-full"><CardHeader><CardTitle className="text-base">{place.name}</CardTitle><CardDescription>{place.categories?.join(' · ') || 'Category unavailable'}</CardDescription></CardHeader><CardContent className="flex flex-col gap-1 text-sm text-muted-foreground"><p>Coordinates: {place.latitude}, {place.longitude}</p><p>Type and distance score: {typeof place.score === 'number' ? place.score.toFixed(2) : 'Unavailable'}</p><p>Source: {place.source?.provider || 'Google Places'} {place.source?.providerId || ''}</p></CardContent></Card></li>)}</ol>}
+    </> : <p className="text-sm text-muted-foreground">{research?.status === 'failed' ? 'Attraction search failed. See the provider warning below.' : 'No matching nearby attractions were returned.'}</p>}
     {research?.data?.length > 0 && <p className="text-sm text-muted-foreground">Places must match a visitor type or a requested interest type. The score then uses distance. It does not indicate popularity, opening hours, travel time, or visit duration.</p>}
   </Section>;
 }
@@ -120,7 +126,7 @@ function Results({ snapshot, onRestart }) {
       {result.advisor ? <><p className="leading-relaxed">{result.advisor.summary}</p>{result.advisor.recommendations?.length ? <ol className="flex flex-col gap-4">{result.advisor.recommendations.map((recommendation, index) => <li key={`${recommendation.title}-${index}`} className="rounded-lg border p-4"><h3 className="font-medium">{recommendation.title}</h3><p className="mt-2 text-sm">{recommendation.description}</p><p className="mt-2 break-all text-xs text-muted-foreground">Source IDs: {recommendation.sourceIds?.join(', ') || 'None cited'}</p></li>)}</ol> : <p className="text-sm text-muted-foreground">No recommendations were returned.</p>}</> : <p className="text-sm text-muted-foreground">Advisor recommendations are unavailable.</p>}
     </CardContent></Card>
     <Warnings items={result.warnings} />
-    <div className="grid gap-6 lg:grid-cols-2"><Weather research={result.weather} /><Seasonality research={result.seasonality} /><Attractions research={result.attractions} /><Knowledge research={result.knowledge} /></div>
+    <div className="grid gap-6 lg:grid-cols-2"><Weather research={result.weather} /><Seasonality research={result.seasonality} /><div className="lg:col-span-2"><Attractions research={result.attractions} /></div><div className="lg:col-span-2"><Knowledge research={result.knowledge} /></div></div>
   </div>;
 }
 
